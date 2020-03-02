@@ -1,0 +1,63 @@
+Reverse Engineering Code
+
+Overall Function APP:
+
+The overall function of this App is to obtain log-in information from a user that is then stored into the columns of a mySQL database.  The database, named “passport_demo”, has three columns: (1) id column, which is auto-generated, (2) email column, and (3) password column.  The values from the email and password columns are obtained from responses from input elements on the home page that the user enters.  After creating login information and/or logging in, the user is brought to the “/members” path of the “localhost:8080” url.  From a macro perspective, this code represents how to create a log-in page at the root of a application.  
+
+>> Config Directory: 
+
+>> middleware Directory (located inside Config Directory)
+
+isAuthentic.js 
+
+This file contains middleware with code restricting routes a user in not allowed to visit if not logged in.  
+
+———————————————————————————————————————
+if (req.user) {
+	return next();
+}
+———————————————————————————————————————
+
+This line of code allows the user to see previously restricted routes after logging in. 
+
+———————————————————————————————————————
+return res.redirect(‘/“);
+———————————————————————————————————————
+
+This line of code re-directs the user to the login page if they are not logged in.  
+
+Config.json (located outside middleware Directory but inside Config Directory)
+
+This File contains the configuration file for a Sequelized project.  It is a .json File that Sequelize reads to get information about the database.  The file contains three major objects that configure the database.  
+
+“development” Object deals with local development.  For example, inserting information into mySQL workbench, using a local database, utilizes the “development” Object.  The most important Properties of this Object to modify correctly from projects to subsequent projects are the “password” Property and “database” Property.  The “password” Property supplies the password used to enter the database, and the “database” Property defines the database that will be used for the project.  The “dialect” Property defines the connector library for the project, which has a value of “mysql” in the example.  
+
+“test” Object is used for running unit or integration tests and need a database to replicate what the user will see.  
+
+“production” Object is used for assignment-creation purposes.  Using this Object with JAWSdb and Heroku is critical.  
+
+passport.js
+
+
+
+Installed Dependencies (Both related to passport.js)
+
+———————————————————————————————————————
+var passport = require(“passport”)
+———————————————————————————————————————
+
+This line of code requires passport, an authentication middleware for Node.  The purpose of passport is to authenticate requests and use encapsulation to hide the values or state of a structured object inside a model, preventing unauthorized parties direct access to the information.  
+
+———————————————————————————————————————
+var LocalStrategy = require("passport-local").Strategy;
+———————————————————————————————————————
+
+This line of code invokes the “passport-local” module which works specifically with login data related to “username” and “password” fields.  
+
+The syntax of the statement, “var LocalStrategy = require(“passport-local”).Strategy;”, is the standard way of configuration for new localStrategy Objects that have built-in methods for username and password verification.  
+
+
+
+
+
+
