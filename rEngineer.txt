@@ -4,6 +4,16 @@ Overall Function APP:
 
 The overall function of this App is to obtain log-in information from a user that is then stored into the columns of a mySQL database.  The database, named “passport_demo”, has three columns: (1) id column, which is auto-generated, (2) email column, and (3) password column.  The values from the email and password columns are obtained from responses from input elements on the home page that the user enters.  After creating login information and/or logging in, the user is brought to the “/members” path of the “localhost:8080” url.  From a macro perspective, this code represents how to create a log-in page at the root of a application.  
 
+Packages to Install:
+
+“bcryptjs”
+“express”
+“express-session”
+“mysql2”
+“passport”
+“passport-local”
+“sequelize”
+
 >> Config Directory: 
 
 >> middleware Directory (located inside Config Directory)
@@ -38,9 +48,9 @@ This File contains the configuration file for a Sequelized project.  It is a .js
 
 passport.js
 
+This file is primarily used to create the functionality that the “passport.js” Library needs to perform the submission of a username and password to enter the site. 
 
-
-Installed Dependencies (Both related to passport.js)
+Installed Dependencies related to passport.js
 
 ———————————————————————————————————————
 var passport = require(“passport”)
@@ -55,6 +65,374 @@ var LocalStrategy = require("passport-local").Strategy;
 This line of code invokes the “passport-local” module which works specifically with login data related to “username” and “password” fields.  
 
 The syntax of the statement, “var LocalStrategy = require(“passport-local”).Strategy;”, is the standard way of configuration for new localStrategy Objects that have built-in methods for username and password verification.  
+
+
+Dependency Related “../models”
+
+———————————————————————————————————————
+var db = require("../models");
+———————————————————————————————————————
+
+Every model you create in Sequellize goes into the models Folder, “../models”.  This statement 
+
+By making the “db” Object equal to the models Directory, we are able to use that db Object to invoke any model created by Sequelize methods that have the “.db” prefix.  For Example, “db.User.findone({…})”.
+
+Code Block Combining Form Validation and Sequelize Database Addition
+
+———————————————————————————————————————
+var passport = require("passport");
+var LocalStrategy = require("passport-local").Strategy;
+
+var db = require("../models");
+
+// Telling passport we want to use a Local Strategy. In other words, we want login with a username/email and password
+passport.use(new LocalStrategy(
+  // Our user will sign in using an email, rather than a "username"
+  {
+    usernameField: "email"
+  },
+  function(email, password, done) {
+    // When a user tries to sign in, this code runs
+    db.User.findOne({
+      where: {
+        email: email
+      }
+    }).then(function(dbUser) {
+      // If there's no user with the given email
+      if (!dbUser) {
+        return done(null, false, {
+          message: "Incorrect email."
+        });
+      }
+      // If there is a user with the given email, but the password the user gives us is incorrect
+      else if (!dbUser.validPassword(password)) {
+        return done(null, false, {
+          message: "Incorrect password."
+        });
+      }
+      // If none of the above, return the user
+      return done(null, dbUser);
+    });
+  }
+));
+
+// In order to help keep authentication state across HTTP requests,
+// Sequelize needs to serialize and deserialize the user
+// Just consider this part boilerplate needed to make it all work
+passport.serializeUser(function(user, cb) {
+  cb(null, user);
+});
+
+passport.deserializeUser(function(obj, cb) {
+  cb(null, obj);
+});
+
+// Exporting our configured passport
+module.exports = passport;———————————————————————————————————————
+
+The commented portions of the above code explain how all the validation works from the server-side perspective.  
+
+Methods Built-In to passport.js
+
+>> Models Directory
+
+index.js
+
+Index.js is essentially boiler-plate code that allows us to invoke any of the models created in the other “.js” files inside the Models Directory anywhere within the project.  
+
+user.js
+
+The user.js File creates a “User” Model, using the sequelize.define() Method.  The “User” Model contains an “email” Object and a “password” Object, which have shared and unique features.   They both have a “type: DataTypes.STRING” Property:Value.  
+
+“bcryptjs"
+
+
+“bcryptjs" is a password-hashing function.   
+“bcryptjs” is listed under dependencies inside package.json; thus it must be installed into the program.  
+
+———————————————————————————————————————
+var bcrypt = require(“bcryptjs”);
+———————————————————————————————————————
+
+
+
+
+
+.prototype() Property Usage: 
+
+validPassword
+
+The “User” Model uses the .prototype property to create a custom method called “validPassword”.  The method will check whether an unhashed password entered by the user can be compared to the hashed password stored in our database
+
+———————————————————————————————————————
+User.prototype.validPassword = function(password) {
+    return bcrypt.compareSync(password, this.password);
+  };
+———————————————————————————————————————
+
+Hooks
+
+ Hooks are automatic methods that run during various phases of the User-Model lifecycle.
+
+ In this case, before a User is created, we will automatically hash their password.
+
+———————————————————————————————————————
+  User.addHook("beforeCreate", function(user) {
+    user.password = bcrypt.hashSync(user.password, bcrypt.genSaltSync(10), null);
+  });
+  return User;
+};
+———————————————————————————————————————
+
+———————————————————————————————————————
+// Requiring bcrypt for password hashing. Using the bcryptjs version as the regular bcrypt module sometimes causes errors on Windows machines
+var bcrypt = require("bcryptjs");
+// Creating our User model
+module.exports = function(sequelize, DataTypes) {
+  var User = sequelize.define("User", {
+    // The email cannot be null, and must be a proper email before creation
+    email: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      validate: {
+        isEmail: true
+      }
+    },
+    // The password cannot be null
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false
+    }
+  });
+  // Creating a custom method for our User model. This will check if an unhashed password entered by the user can be compared to the hashed password stored in our database
+  User.prototype.validPassword = function(password) {
+    return bcrypt.compareSync(password, this.password);
+  };
+  // Hooks are automatic methods that run during various phases of the User Model lifecycle
+  // In this case, before a User is created, we will automatically hash their password
+  User.addHook("beforeCreate", function(user) {
+    user.password = bcrypt.hashSync(user.password, bcrypt.genSaltSync(10), null);
+  });
+  return User;
+};
+———————————————————————————————————————
+
+The User Model does not have any Associations.
+
+>> Public Directory
+
+The Public Directory contains the main functionality for the functional transitions of the page.  
+
+login.js
+
+This file contains the functionality for creating an AJAX Post call to the “/api/login” route.
+
+When a “submit” Event occurs on the <input> Elements on the “login.html” <form> Elements, the email and password information is saved as a “userData” Object that is validated and then sent to a “$.post” function to be saved on the “/api/login” route. 
+
+After the newly created member’s name is saved, a “window.location.replace(“/members”);” statement brings the user to the members page, which is “members.html.”
+
+members.js
+
+This file executes a GET request to determine which user logged in following an “.on(“submit”)” Event triggered on the submit button in the “/api/login” or “/api/signup” pages.   
+
+———————————————————————————————————————
+  $.get("/api/user_data").then(function(data) {
+    $(".member-name").text(data.email);
+  });
+———————————————————————————————————————
+
+After the GET request has been executed, an update is sent to the HTML on the page.  
+
+The route for the GET request is “/api/user_data”.  
+
+    $(“.member-name").text(data.email);  =  After signing up or logging into the site, accessing the “/members” path, the  “<h2>Welcome <span class=“member-name”></span></h2>" Element on the puts the “data.email” or the email of the user dynamically inside the span tag on the “member.html” page.  
+
+data.email = refers to the email Property inside of the $.post() Function inside “login.js” and ”signup.js”.  The response Object is re-named “data” inside the the parameter of the .then() Function of the $.get statement.  
+
+signup.js
+
+This file contains the functionality for creating an AJAX Post that reads the value of the <input> Elements on the “signup.html” page after a “submit” Event occurs while the user is on the page.  
+
+The Event is called on the whole form element — var signUpForm = $(“form.signup”) — when the “submit” button is clicked.  The Event is an “on(“submit”)” Event.  
+
+After the validation and creation of the “userData” Object containing the email and password information, the user’s information is saved as an Object on the signup path, “/api/signup”,  through the “$.post(…)” Method.  
+
+After the newly created member’s name is saved, a “window.location.replace(“/members”);” statement brings the user to the members page, which is “members.html.”
+
+HTML Documents
+
+BootStrap
+
+All three documents require BootStrap; therefore, the developer needs to be aware of this styling framework. 
+
+Inter-Linking Between HTML Documents
+
+The “login.html” and “signup.html” Files contain a link to take the user between the login.html and signup.html Files:  “<p>Or sign up <a href=“/“>here</a></p>"  +  <p>Or log in <a href=“/login”>here</a></p>.  
+
+The “member.html” File contains a link to take the user to the “/logout” path of the website:   <a class="navbar-brand" href=“/logout”>.
+
+style.css
+
+They only stylesheet modification used is margin-top Setting on the “form.signup” and “form.login”.  
+
+>> Routes Directory
+
+  api-routes.js
+
+Required Exports
+
+———————————————————————————————————————
+var db = require("../models");
+var passport = require("../config/passport");
+———————————————————————————————————————
+
+We are requiring the models configured in the config (passport.js) and models (user.js) Directories.
+
+Routes Assessed: 
+
+Route For Authenticating passport.js Information
+
+This statement uses the passport.authenticate middleware in conjunction with the local strategy.  If the user has valid login credentials, they are brought to the member’s page; otherwise, the user is sent an error.
+
+———————————————————————————————————————
+module.exports = function(app) {
+  app.post("/api/login", passport.authenticate("local"), function(req, res) {
+    res.json(req.user);
+  });
+——————————————————————————————————————— 
+=====================================================================
+
+Route For Creating a New “User” from “User Model”.
+
+———————————————————————————————————————
+ app.post("/api/signup", function(req, res) {
+    db.User.create({
+      email: req.body.email,
+      password: req.body.password
+    })
+      .then(function() {
+        res.redirect(307, "/api/login");
+      })
+      .catch(function(err) {
+        res.status(401).json(err);
+      });
+  });
+———————————————————————————————————————
+
+Route for signing up a user.  The user's password is automatically hashed and stored securely based upon how we configured our Sequelize User-Model.  If the user is created successfully, proceed to log the user in; otherwise, send back an error.  
+
+Note the efficient use of the .then() and .catch() statements to efficiently validate and modify the user’s transition through the page. 
+
+The create({}) method is called on “db.User”, the User Model created in “user.js”, with email and password Properties being sent to the “/api/signup“ route.  
+
+Note that the value of the email and password Properties are “req.body.email” and “req.body.password”, respectively. 
+=====================================================================
+
+Route For Logging Out User
+
+———————————————————————————————————————
+  app.get("/logout", function(req, res) {
+    req.logout();
+    res.redirect("/");
+  });
+———————————————————————————————————————
+
+This route is used to log the user out after a click Event occurs on the <a class="navbar-brand" href=“/logout"> Element on the “members.html” Page.   
+=====================================================================
+
+Route For Getting Data About User To Use Client-Side
+
+———————————————————————————————————————
+  app.get("/api/user_data", function(req, res) {
+    if (!req.user) {
+      // The user is not logged in, send back an empty object
+      res.json({});
+    } else {
+      // Otherwise send back the user's email and id
+      // Sending back a password, even a hashed password, isn't a good idea
+      res.json({
+        email: req.user.email,
+        id: req.user.id
+      });
+    }
+  });
+};
+———————————————————————————————————————
+
+This route is used to obtain data about our user to be used on the client side.  
+
+The “/api/user_data”) route is also used in the member.js File as a $.get request to obtain the user’s information, then displays the data.email.
+
+“req.user.email” + “req.user.id" :  This is the code that relays the information about members, after they have logged in, to the Application.  This app.get() statement makes a request to the “/api/user_data” route to obtain the information stored inside the app.post() request with the db.User.create({}) Method inside. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
